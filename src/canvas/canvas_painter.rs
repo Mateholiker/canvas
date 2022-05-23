@@ -146,3 +146,12 @@ where
         }
     }
 }
+
+impl Drawable for () {
+    fn draw(&mut self, _painter: &CanvasPainter) {}
+
+    fn get_cutout(&mut self) -> Rect {
+        //dummy value
+        Rect::from_two_pos((0.0, 0.0).into(), (10.0, 10.0).into())
+    }
+}
