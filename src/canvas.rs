@@ -28,6 +28,10 @@ impl CanvasState {
         self.draw_data = Box::new(draw_data);
     }
 
+    pub fn draw_data_mut(&mut self) -> &mut Box<dyn Drawable> {
+        &mut self.draw_data
+    }
+
     fn reset_cutout(&mut self) {
         self.current_cutout = self.draw_data.get_cutout();
     }
