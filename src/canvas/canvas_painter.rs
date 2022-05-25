@@ -89,6 +89,10 @@ impl<'p> CanvasPainter<'p> {
         }
     }
 
+    pub fn bounding_box(&self) -> Rect {
+        self.painter.clip_rect()
+    }
+
     pub fn line_segment(&self, points: (Position, Position), stroke: impl Into<Stroke>) {
         let points = [
             points
