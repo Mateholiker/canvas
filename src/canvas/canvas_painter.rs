@@ -4,7 +4,9 @@ use std::rc::Rc;
 
 use eframe::egui::Vec2 as GuiVec;
 use eframe::egui::{Color32, Context, Painter, Pos2, Rect, Response, Stroke, Ui};
-use simple_math::Rectangle;
+use eframe::emath::Align2;
+use eframe::epaint::FontId;
+use simple_math::{Rectangle, Vec2};
 
 const MIN_PADDING: f32 = 20.0;
 
@@ -157,6 +159,26 @@ impl<'p> CanvasPainter<'p> {
     pub fn circle_filled(&self, center: Position, radius: f32, fill_color: impl Into<Color32>) {
         let center = center.to_gui_space(self.gui_space, self.current_cutout);
         self.painter.circle_filled(center, radius, fill_color);
+    }
+
+    pub fn text(
+        &self,
+        pos: Position,
+        anchor: Align2,
+        text: impl ToString,
+        font_id: FontId,
+        text_color: Color32,
+    ) {
+        let pos = pos.to_gui_space(self.gui_space, self.current_cutout);
+        self.painter.text(pos, anchor, text, font_id, text_color);
+    }
+
+    pub fn text_size(&self, text: impl ToString, font_id: FontId) -> Vec2 {
+        //color is just a dummy value
+        let gally = self
+            .painter
+            .layout_no_wrap(text.to_string(), font_id, Color32::BLACK);
+        gally.size().into()
     }
 }
 
