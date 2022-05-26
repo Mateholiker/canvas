@@ -124,6 +124,14 @@ impl<'p> CanvasPainter<'p> {
         }
     }
 
+    pub fn convert_to_overlay_space(&self, pos: Position) -> Position {
+        Position::Overlay(pos.to_overlay_space(self.gui_space, self.current_cutout))
+    }
+
+    pub fn convert_to_canvas_space(&self, pos: Position) -> Position {
+        Position::Canvas(pos.to_canvas_space(self.gui_space, self.current_cutout))
+    }
+
     pub fn bounding_box(&self) -> Rectangle {
         let gui_rect = self.painter.clip_rect();
         Rectangle::new(gui_rect.max.into(), gui_rect.min.into())
