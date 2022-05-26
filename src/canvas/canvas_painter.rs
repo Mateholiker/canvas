@@ -1,52 +1,82 @@
 use eframe::egui::Vec2 as GuiVec;
 use eframe::egui::{Color32, Context, Painter, Pos2, Rect, Response, Stroke, Ui};
+use simple_math::Rectangle;
 
 const MIN_PADDING: f32 = 20.0;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Position {
+    Gui(Pos2),
     Overlay(Pos2),
     Canvas(Pos2),
 }
 
 impl Position {
-    pub(super) fn to_overlay_space(self, canvas_space: Rect, current_cutout: Rect) -> Pos2 {
-        use Position::{Canvas, Overlay};
+    fn to_gui_space(self, gui_space: Rect, current_cutout: Rect) -> Pos2 {
+        use Position::{Canvas, Gui, Overlay};
+        match self {
+            Canvas(_) => {
+                let overlay = Overlay(self.to_overlay_space(gui_space, current_cutout));
+                overlay.to_gui_space(gui_space, current_cutout)
+            }
+
+            Overlay(pos) => Pos2 {
+                x: pos.x,
+                y: gui_space.max.y - pos.y,
+            },
+
+            Gui(pos) => pos,
+        }
+    }
+
+    fn to_overlay_space(self, gui_space: Rect, current_cutout: Rect) -> Pos2 {
+        use Position::{Canvas, Gui, Overlay};
         let (padding, scaling_factor) =
-            Position::calculate_padding_and_scaling_factor(canvas_space, current_cutout);
+            Position::calculate_padding_and_scaling_factor(gui_space, current_cutout);
         match self {
             Canvas(pos) => {
                 let new_vec = (pos.to_vec2() - current_cutout.min.to_vec2()) * scaling_factor
                     + padding
-                    + canvas_space.min.to_vec2();
+                    + gui_space.min.to_vec2();
                 new_vec.to_pos2()
             }
             Overlay(pos) => pos,
+
+            Gui(pos) => Pos2 {
+                x: pos.x,
+                y: gui_space.max.y - pos.y,
+            },
         }
     }
 
-    pub(super) fn to_canvas_space(self, canvas_space: Rect, current_cutout: Rect) -> Pos2 {
-        use Position::{Canvas, Overlay};
+    pub(super) fn to_canvas_space(self, gui_space: Rect, current_cutout: Rect) -> Pos2 {
+        use Position::{Canvas, Gui, Overlay};
         let (padding, scaling_factor) =
-            Position::calculate_padding_and_scaling_factor(canvas_space, current_cutout);
+            Position::calculate_padding_and_scaling_factor(gui_space, current_cutout);
         match self {
             Canvas(pos) => pos,
+
             Overlay(pos) => {
-                let canvas_vec = (pos.to_vec2() - padding - canvas_space.min.to_vec2())
+                let canvas_vec = (pos.to_vec2() - padding - gui_space.min.to_vec2())
                     / scaling_factor
                     + current_cutout.min.to_vec2();
                 canvas_vec.to_pos2()
+            }
+
+            Gui(_) => {
+                let overlay = Overlay(self.to_overlay_space(gui_space, current_cutout));
+                overlay.to_canvas_space(gui_space, current_cutout)
             }
         }
     }
 
     pub(super) fn calculate_padding_and_scaling_factor(
-        canvas_space: Rect,
+        gui_space: Rect,
         current_cutout: Rect,
     ) -> (GuiVec, f32) {
         //calulate the rations of the spaces
         let ratio_trajectories = current_cutout.aspect_ratio();
-        let ratio_canvas = canvas_space.shrink(MIN_PADDING).aspect_ratio();
+        let ratio_canvas = gui_space.shrink(MIN_PADDING).aspect_ratio();
 
         //calulate the scaling factor and padding
         let scaling_factor;
@@ -54,14 +84,14 @@ impl Position {
         let y_padding;
         if ratio_trajectories < ratio_canvas {
             // y-Axe is limiting
-            scaling_factor = canvas_space.shrink(MIN_PADDING).height() / current_cutout.height();
-            x_padding = (canvas_space.width() - current_cutout.width() * scaling_factor) / 2.0;
+            scaling_factor = gui_space.shrink(MIN_PADDING).height() / current_cutout.height();
+            x_padding = (gui_space.width() - current_cutout.width() * scaling_factor) / 2.0;
             y_padding = MIN_PADDING;
         } else {
             // x-Axe is limiting
-            scaling_factor = canvas_space.shrink(MIN_PADDING).width() / current_cutout.width();
+            scaling_factor = gui_space.shrink(MIN_PADDING).width() / current_cutout.width();
             x_padding = MIN_PADDING;
-            y_padding = (canvas_space.height() - current_cutout.height() * scaling_factor) / 2.0;
+            y_padding = (gui_space.height() - current_cutout.height() * scaling_factor) / 2.0;
         }
 
         //get padding vector
@@ -74,39 +104,37 @@ impl Position {
     }
 }
 
+///mirrors the guidd
 pub struct CanvasPainter<'p> {
     painter: &'p Painter,
     current_cutout: Rect,
-    canvas_space: Rect,
+    gui_space: Rect,
 }
 
 impl<'p> CanvasPainter<'p> {
-    pub(super) fn new(ui: &Ui, current_cutout: Rect, canvas_space: Rect) -> CanvasPainter {
+    pub(super) fn new(ui: &Ui, current_cutout: Rect, gui_space: Rect) -> CanvasPainter {
         CanvasPainter {
             painter: ui.painter(),
             current_cutout,
-            canvas_space,
+            gui_space,
         }
     }
 
-    pub fn bounding_box(&self) -> Rect {
-        self.painter.clip_rect()
+    pub fn bounding_box(&self) -> Rectangle {
+        let gui_rect = self.painter.clip_rect();
+        Rectangle::new(gui_rect.max.into(), gui_rect.min.into())
     }
 
     pub fn line_segment(&self, points: (Position, Position), stroke: impl Into<Stroke>) {
         let points = [
-            points
-                .0
-                .to_overlay_space(self.canvas_space, self.current_cutout),
-            points
-                .1
-                .to_overlay_space(self.canvas_space, self.current_cutout),
+            points.0.to_gui_space(self.gui_space, self.current_cutout),
+            points.1.to_gui_space(self.gui_space, self.current_cutout),
         ];
         self.painter.line_segment(points, stroke);
     }
 
     pub fn circle_filled(&self, center: Position, radius: f32, fill_color: impl Into<Color32>) {
-        let center = center.to_overlay_space(self.canvas_space, self.current_cutout);
+        let center = center.to_gui_space(self.gui_space, self.current_cutout);
         self.painter.circle_filled(center, radius, fill_color);
     }
 }
