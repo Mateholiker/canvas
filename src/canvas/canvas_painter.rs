@@ -16,6 +16,12 @@ pub enum Position {
 }
 
 impl Position {
+    pub fn get_raw_pos(self) -> Pos2 {
+        use Position::{Canvas, Gui, Overlay};
+        let (Gui(pos) | Overlay(pos) | Canvas(pos)) = self;
+        pos
+    }
+
     fn to_gui_space(self, gui_space: Rect, current_cutout: Rect) -> Pos2 {
         use Position::{Canvas, Gui, Overlay};
         match self {
