@@ -1,3 +1,5 @@
+use std::mem::swap;
+
 use eframe::egui::{vec2, Color32, Key, Rect, Response, Sense, Ui, Widget};
 use eframe::egui::{Align2, Vec2 as GuiVec};
 use eframe::epaint::FontId;
@@ -12,20 +14,27 @@ pub struct CanvasState {
 }
 
 impl CanvasState {
-    pub fn new(mut draw_data: impl Drawable + 'static) -> CanvasState {
+    pub fn new() -> CanvasState {
         use CanvasMode::Normal;
 
+        let mut draw_data = Box::new(());
         let default_cutout = draw_data.get_cutout();
 
         CanvasState {
-            draw_data: Box::new(draw_data),
+            draw_data,
             current_cutout: default_cutout,
             mode: Normal,
         }
     }
 
-    pub fn set_draw_data(&mut self, draw_data: impl Drawable + 'static) {
-        self.draw_data = Box::new(draw_data);
+    pub fn set_draw_data(&mut self, draw_data: Box<dyn Drawable>) {
+        self.draw_data = draw_data;
+    }
+
+    pub fn take_draw_data(&mut self) -> Box<dyn Drawable> {
+        let mut draw_data: Box<dyn Drawable> = Box::new(());
+        swap(&mut draw_data, &mut self.draw_data);
+        draw_data
     }
 
     pub fn draw_data_mut(&mut self) -> &mut Box<dyn Drawable> {
@@ -34,6 +43,12 @@ impl CanvasState {
 
     fn reset_cutout(&mut self) {
         self.current_cutout = self.draw_data.get_cutout();
+    }
+}
+
+impl Default for CanvasState {
+    fn default() -> Self {
+        CanvasState::new()
     }
 }
 

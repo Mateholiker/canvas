@@ -1,3 +1,7 @@
+use std::cell::RefCell;
+use std::ops::DerefMut;
+use std::rc::Rc;
+
 use eframe::egui::Vec2 as GuiVec;
 use eframe::egui::{Color32, Context, Painter, Pos2, Rect, Response, Stroke, Ui};
 use simple_math::Rectangle;
@@ -185,5 +189,66 @@ impl Drawable for () {
     fn get_cutout(&mut self) -> Rect {
         //dummy value
         Rect::from_two_pos((0.0, 0.0).into(), (10.0, 10.0).into())
+    }
+}
+
+impl<T> Drawable for Rc<RefCell<T>>
+where
+    T: Drawable,
+{
+    fn draw(&mut self, painter: &CanvasPainter) {
+        let mut borrow = self.borrow_mut();
+        borrow.draw(painter);
+    }
+
+    fn get_cutout(&mut self) -> Rect {
+        let mut borrow = self.borrow_mut();
+        borrow.get_cutout()
+    }
+
+    fn handle_input(&mut self, ctx: &Context, response: &Response) {
+        let mut borrow = self.borrow_mut();
+        borrow.handle_input(ctx, response);
+    }
+}
+
+impl<T> Drawable for Box<T>
+where
+    T: Drawable,
+{
+    fn draw(&mut self, painter: &CanvasPainter) {
+        self.deref_mut().draw(painter);
+    }
+
+    fn get_cutout(&mut self) -> Rect {
+        self.deref_mut().get_cutout()
+    }
+
+    fn handle_input(&mut self, ctx: &Context, response: &Response) {
+        self.deref_mut().handle_input(ctx, response);
+    }
+}
+
+impl<T, G> Drawable for (T, G)
+where
+    T: Drawable,
+    G: Drawable,
+{
+    fn draw(&mut self, painter: &CanvasPainter) {
+        self.0.draw(painter);
+        self.1.draw(painter);
+    }
+
+    fn get_cutout(&mut self) -> Rect {
+        let rect0 = self.0.get_cutout();
+        let rect1 = self.1.get_cutout();
+
+        rect0.union(rect1)
+    }
+
+    #[allow(unused_variables)]
+    fn handle_input(&mut self, ctx: &Context, response: &Response) {
+        self.0.handle_input(ctx, response);
+        self.1.handle_input(ctx, response);
     }
 }
