@@ -161,15 +161,15 @@ impl<'s> Widget for Canvas<'s> {
         ui.set_clip_rect(gui_space);
         let painter = ui.painter();
 
-        //draw a frame around the Trajectories
-        painter.rect_stroke(gui_space, 0.0, (1.0, Color32::DARK_RED));
-
         //manage user input
         self.manage_user_input(ui, gui_space, &response);
 
         //draw the Drawable Data
-        let painter = CanvasPainter::new(ui, self.state.current_cutout, gui_space);
-        self.state.draw_data.draw(&painter);
+        let canvas_painter = CanvasPainter::new(ui, self.state.current_cutout, gui_space);
+        self.state.draw_data.draw(&canvas_painter);
+
+        //draw a frame around the Trajectories
+        painter.rect_stroke(gui_space, 0.0, (1.0, Color32::DARK_RED));
 
         response
     }
