@@ -146,13 +146,10 @@ impl<'p> CanvasPainter<'p> {
     }
 
     pub fn line_segment(&self, points: (Position, Position), stroke: impl Into<Stroke>) {
-        dbg!(points);
         let points = [
             points.0.to_gui_space(self.gui_space, self.current_cutout),
             points.1.to_gui_space(self.gui_space, self.current_cutout),
         ];
-        dbg!(self.gui_space);
-        dbg!(points);
         self.painter.line_segment(points, stroke);
     }
 
