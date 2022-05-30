@@ -24,12 +24,13 @@ impl Position {
         pos
     }
 
-    fn to_gui_space(self, gui_space: Rect, current_cutout: Rect) -> Pos2 {
+    fn to_gui_space(self, gui_space: Rect, current_cutout: Rect, aspect_ratio: f32) -> Pos2 {
         use Position::{Canvas, Gui, Overlay};
         match self {
             Canvas(_) => {
-                let overlay = Overlay(self.to_overlay_space(gui_space, current_cutout));
-                overlay.to_gui_space(gui_space, current_cutout)
+                let overlay =
+                    Overlay(self.to_overlay_space(gui_space, current_cutout, aspect_ratio));
+                overlay.to_gui_space(gui_space, current_cutout, aspect_ratio)
             }
 
             Overlay(pos) => Pos2 {
@@ -41,16 +42,20 @@ impl Position {
         }
     }
 
-    fn to_overlay_space(self, gui_space: Rect, current_cutout: Rect) -> Pos2 {
+    fn to_overlay_space(self, gui_space: Rect, current_cutout: Rect, aspect_ratio: f32) -> Pos2 {
         use Position::{Canvas, Gui, Overlay};
         let (padding, scaling_factor) =
-            Position::calculate_padding_and_scaling_factor(gui_space, current_cutout);
+            Position::calculate_padding_and_scaling_factor(gui_space, current_cutout, aspect_ratio);
         match self {
             Canvas(pos) => {
-                let new_vec = (pos.to_vec2() - current_cutout.min.to_vec2()) * scaling_factor
-                    + padding
-                    + gui_space.min.to_vec2();
-                new_vec.to_pos2()
+                let padding: GuiVec = padding.into();
+                let canvas_vec_moved = pos.to_vec2() - current_cutout.min.to_vec2();
+                let canvas_vec_scaled = GuiVec {
+                    x: canvas_vec_moved.x * scaling_factor.x(),
+                    y: canvas_vec_moved.y * scaling_factor.y(),
+                };
+                let overlay_vec = canvas_vec_scaled + padding + gui_space.min.to_vec2();
+                overlay_vec.to_pos2()
             }
             Overlay(pos) => pos,
 
@@ -61,23 +66,33 @@ impl Position {
         }
     }
 
-    pub(super) fn to_canvas_space(self, gui_space: Rect, current_cutout: Rect) -> Pos2 {
+    pub(super) fn to_canvas_space(
+        self,
+        gui_space: Rect,
+        current_cutout: Rect,
+        aspect_ratio: f32,
+    ) -> Pos2 {
         use Position::{Canvas, Gui, Overlay};
         let (padding, scaling_factor) =
-            Position::calculate_padding_and_scaling_factor(gui_space, current_cutout);
+            Position::calculate_padding_and_scaling_factor(gui_space, current_cutout, aspect_ratio);
         match self {
             Canvas(pos) => pos,
 
             Overlay(pos) => {
-                let canvas_vec = (pos.to_vec2() - padding - gui_space.min.to_vec2())
-                    / scaling_factor
-                    + current_cutout.min.to_vec2();
+                let padding: GuiVec = padding.into();
+                let overlay_vec_moved = pos.to_vec2() - padding - gui_space.min.to_vec2();
+                let overlay_vec_scaled = GuiVec {
+                    x: overlay_vec_moved.x / scaling_factor.x(),
+                    y: overlay_vec_moved.y / scaling_factor.y(),
+                };
+                let canvas_vec = overlay_vec_scaled + current_cutout.min.to_vec2();
                 canvas_vec.to_pos2()
             }
 
             Gui(_) => {
-                let overlay = Overlay(self.to_overlay_space(gui_space, current_cutout));
-                overlay.to_canvas_space(gui_space, current_cutout)
+                let overlay =
+                    Overlay(self.to_overlay_space(gui_space, current_cutout, aspect_ratio));
+                overlay.to_canvas_space(gui_space, current_cutout, aspect_ratio)
             }
         }
     }
@@ -85,10 +100,17 @@ impl Position {
     pub(super) fn calculate_padding_and_scaling_factor(
         gui_space: Rect,
         current_cutout: Rect,
-    ) -> (GuiVec, f32) {
+        aspect_ratio: f32,
+    ) -> (Vec2, Vec2) {
         //calulate the rations of the spaces
-        let ratio_trajectories = current_cutout.aspect_ratio();
+        let ratio_trajectories = current_cutout.aspect_ratio() * aspect_ratio;
         let ratio_canvas = gui_space.shrink(MIN_PADDING).aspect_ratio();
+
+        let (x_stretch, y_stretch) = if aspect_ratio > 1.0 {
+            (aspect_ratio, 1.0)
+        } else {
+            (1.0, 1.0 / aspect_ratio)
+        };
 
         //calulate the scaling factor and padding
         let scaling_factor;
@@ -96,21 +118,23 @@ impl Position {
         let y_padding;
         if ratio_trajectories < ratio_canvas {
             // y-Axe is limiting
-            scaling_factor = gui_space.shrink(MIN_PADDING).height() / current_cutout.height();
+            scaling_factor =
+                gui_space.shrink(MIN_PADDING).height() / (current_cutout.height() * y_stretch);
             x_padding = (gui_space.width() - current_cutout.width() * scaling_factor) / 2.0;
             y_padding = MIN_PADDING;
         } else {
             // x-Axe is limiting
-            scaling_factor = gui_space.shrink(MIN_PADDING).width() / current_cutout.width();
+            scaling_factor =
+                gui_space.shrink(MIN_PADDING).width() / (current_cutout.width() * x_stretch);
             x_padding = MIN_PADDING;
             y_padding = (gui_space.height() - current_cutout.height() * scaling_factor) / 2.0;
         }
+        let x_scaling_factor = scaling_factor * x_stretch;
+        let y_scaling_factor = scaling_factor * y_stretch;
 
         //get padding vector
-        let padding = GuiVec {
-            x: x_padding,
-            y: y_padding,
-        };
+        let padding = Vec2::new(x_padding, y_padding);
+        let scaling_factor = Vec2::new(x_scaling_factor, y_scaling_factor);
 
         (padding, scaling_factor)
     }
@@ -121,23 +145,38 @@ pub struct CanvasPainter<'p> {
     painter: &'p Painter,
     current_cutout: Rect,
     gui_space: Rect,
+    aspect_ratio: f32,
 }
 
 impl<'p> CanvasPainter<'p> {
-    pub(super) fn new(ui: &Ui, current_cutout: Rect, gui_space: Rect) -> CanvasPainter {
+    pub(super) fn new(
+        ui: &Ui,
+        current_cutout: Rect,
+        gui_space: Rect,
+        aspect_ratio: f32,
+    ) -> CanvasPainter {
         CanvasPainter {
             painter: ui.painter(),
             current_cutout,
             gui_space,
+            aspect_ratio,
         }
     }
 
     pub fn convert_to_overlay_space(&self, pos: Position) -> Position {
-        Position::Overlay(pos.to_overlay_space(self.gui_space, self.current_cutout))
+        Position::Overlay(pos.to_overlay_space(
+            self.gui_space,
+            self.current_cutout,
+            self.aspect_ratio,
+        ))
     }
 
     pub fn convert_to_canvas_space(&self, pos: Position) -> Position {
-        Position::Canvas(pos.to_canvas_space(self.gui_space, self.current_cutout))
+        Position::Canvas(pos.to_canvas_space(
+            self.gui_space,
+            self.current_cutout,
+            self.aspect_ratio,
+        ))
     }
 
     pub fn bounding_box(&self) -> Rectangle {
@@ -147,14 +186,18 @@ impl<'p> CanvasPainter<'p> {
 
     pub fn line_segment(&self, points: (Position, Position), stroke: impl Into<Stroke>) {
         let points = [
-            points.0.to_gui_space(self.gui_space, self.current_cutout),
-            points.1.to_gui_space(self.gui_space, self.current_cutout),
+            points
+                .0
+                .to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio),
+            points
+                .1
+                .to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio),
         ];
         self.painter.line_segment(points, stroke);
     }
 
     pub fn circle_filled(&self, center: Position, radius: f32, fill_color: impl Into<Color32>) {
-        let center = center.to_gui_space(self.gui_space, self.current_cutout);
+        let center = center.to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio);
         self.painter.circle_filled(center, radius, fill_color);
     }
 
@@ -166,7 +209,7 @@ impl<'p> CanvasPainter<'p> {
         font_id: FontId,
         text_color: Color32,
     ) {
-        let pos = pos.to_gui_space(self.gui_space, self.current_cutout);
+        let pos = pos.to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio);
         self.painter.text(pos, anchor, text, font_id, text_color);
     }
 

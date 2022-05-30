@@ -1,8 +1,9 @@
 use std::mem::swap;
 
+use eframe::egui::Vec2 as GuiVec;
 use eframe::egui::{vec2, Color32, Key, Rect, Response, Sense, Ui, Widget};
-use eframe::egui::{Align2, Vec2 as GuiVec};
-use eframe::epaint::FontId;
+
+use eframe::epaint::{FontId, Rounding};
 
 pub mod canvas_painter;
 use canvas_painter::{CanvasPainter, Drawable, Position};
@@ -11,10 +12,11 @@ pub struct CanvasState {
     draw_data: Box<dyn Drawable>,
     current_cutout: Rect,
     mode: CanvasMode,
+    aspect_ratio: f32,
 }
 
 impl CanvasState {
-    pub fn new() -> CanvasState {
+    pub fn new(aspect_ratio: f32) -> CanvasState {
         use CanvasMode::Normal;
 
         let mut draw_data = Box::new(());
@@ -24,6 +26,7 @@ impl CanvasState {
             draw_data,
             current_cutout: default_cutout,
             mode: Normal,
+            aspect_ratio,
         }
     }
 
@@ -48,7 +51,7 @@ impl CanvasState {
 
 impl Default for CanvasState {
     fn default() -> Self {
-        CanvasState::new()
+        CanvasState::new(1.0)
     }
 }
 
@@ -75,15 +78,27 @@ impl<'s> Canvas<'s> {
         let painter = ui.painter();
         if let Some(curser_gui_pos) = response.hover_pos() {
             let position = Position::Gui(curser_gui_pos);
-            let curser_canvas_pos = position.to_canvas_space(gui_space, self.state.current_cutout);
+            let curser_canvas_pos = position.to_canvas_space(
+                gui_space,
+                self.state.current_cutout,
+                self.state.aspect_ratio,
+            );
 
-            painter.text(
-                gui_space.min + GuiVec::from((10.0, 10.0)),
-                Align2::LEFT_CENTER,
+            let galley = painter.layout_no_wrap(
                 format!("Cursor: {:?}", curser_canvas_pos),
                 FontId::monospace(20.0),
                 Color32::LIGHT_GRAY,
             );
+
+            let pos = gui_space.min + GuiVec::from((10.0, 10.0));
+
+            let size = galley.size() + GuiVec::from((10.0, 10.0));
+            painter.rect_filled(
+                Rect::from_min_size(pos, size),
+                Rounding::same(2.0),
+                Color32::DARK_BLUE,
+            );
+            painter.galley(pos + GuiVec::from((5.0, 5.0)), galley);
         }
 
         let input = ui.input();
@@ -102,7 +117,11 @@ impl<'s> Canvas<'s> {
                         //this means its relative position must not change
                         let position = Position::Gui(curser_gui_pos);
                         let fix_point = position
-                            .to_canvas_space(gui_space, self.state.current_cutout)
+                            .to_canvas_space(
+                                gui_space,
+                                self.state.current_cutout,
+                                self.state.aspect_ratio,
+                            )
                             .to_vec2();
 
                         //one click with the mouse wheel is 50.0 in scroll_delta
@@ -142,11 +161,18 @@ impl<'s> Canvas<'s> {
                     let (_padding, scaling_factor) = Position::calculate_padding_and_scaling_factor(
                         gui_space,
                         self.state.current_cutout,
+                        self.state.aspect_ratio,
                     );
-                    let new_cutout = self
-                        .state
-                        .current_cutout
-                        .translate(-response.drag_delta() / scaling_factor);
+                    let translation_raw = response.drag_delta();
+                    let translation_scaled = GuiVec {
+                        x: translation_raw.x / scaling_factor.x(),
+                        y: translation_raw.y / scaling_factor.y(),
+                    };
+                    let translation_rotated = GuiVec {
+                        x: -translation_scaled.x,
+                        y: translation_scaled.y,
+                    };
+                    let new_cutout = self.state.current_cutout.translate(translation_rotated);
                     self.state.current_cutout = new_cutout;
                 }
             }
@@ -161,12 +187,17 @@ impl<'s> Widget for Canvas<'s> {
         ui.set_clip_rect(gui_space);
         let painter = ui.painter();
 
+        //draw the Drawable Data
+        let canvas_painter = CanvasPainter::new(
+            ui,
+            self.state.current_cutout,
+            gui_space,
+            self.state.aspect_ratio,
+        );
+        self.state.draw_data.draw(&canvas_painter);
+
         //manage user input
         self.manage_user_input(ui, gui_space, &response);
-
-        //draw the Drawable Data
-        let canvas_painter = CanvasPainter::new(ui, self.state.current_cutout, gui_space);
-        self.state.draw_data.draw(&canvas_painter);
 
         //draw a frame around the Trajectories
         painter.rect_stroke(gui_space, 0.0, (1.0, Color32::DARK_RED));
