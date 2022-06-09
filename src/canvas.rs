@@ -200,7 +200,7 @@ impl<'s> Widget for Canvas<'s> {
         self.manage_user_input(ui, gui_space, &response);
 
         //draw a frame around the Trajectories
-        painter.rect_stroke(gui_space, 0.0, (1.0, Color32::DARK_RED));
+        painter.rect_stroke(gui_space, 0.0, (5.0, Color32::DARK_RED));
 
         response
     }
