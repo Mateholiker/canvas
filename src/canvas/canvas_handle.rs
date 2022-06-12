@@ -1,6 +1,6 @@
 use eframe::egui::{Color32, Rect, Stroke, Ui};
-use eframe::emath::Align2;
-use eframe::epaint::FontId;
+use eframe::emath::{Align2, Pos2};
+use eframe::epaint::{FontId, Rounding};
 use simple_math::{Rectangle, Vec2};
 
 use crate::Position;
@@ -44,6 +44,10 @@ impl<'p> CanvasHandle<'p> {
         ))
     }
 
+    fn convert_to_gui_space(&self, pos: Position) -> Pos2 {
+        pos.to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio)
+    }
+
     pub fn bounding_box(&self) -> Rectangle {
         let gui_rect = self.ui.painter().clip_rect();
         Rectangle::new(gui_rect.max.into(), gui_rect.min.into())
@@ -51,19 +55,30 @@ impl<'p> CanvasHandle<'p> {
 
     pub fn line_segment(&mut self, points: (Position, Position), stroke: impl Into<Stroke>) {
         let points = [
-            points
-                .0
-                .to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio),
-            points
-                .1
-                .to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio),
+            self.convert_to_gui_space(points.0),
+            self.convert_to_gui_space(points.1),
         ];
         self.ui.painter().line_segment(points, stroke);
     }
 
     pub fn circle_filled(&mut self, center: Position, radius: f32, fill_color: impl Into<Color32>) {
-        let center = center.to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio);
+        let center = self.convert_to_gui_space(center);
         self.ui.painter().circle_filled(center, radius, fill_color);
+    }
+
+    pub fn rect(
+        &mut self,
+        corner_a: Position,
+        corner_b: Position,
+        rounding: impl Into<Rounding>,
+        fill_color: impl Into<Color32>,
+        stroke: impl Into<Stroke>,
+    ) {
+        let corner_a = self.convert_to_gui_space(corner_a);
+        let corner_b = self.convert_to_gui_space(corner_b);
+        let rect = Rect::from_two_pos(corner_a, corner_b);
+
+        self.ui.painter().rect(rect, rounding, fill_color, stroke);
     }
 
     pub fn text(
@@ -74,7 +89,7 @@ impl<'p> CanvasHandle<'p> {
         font_id: FontId,
         text_color: Color32,
     ) {
-        let pos = pos.to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio);
+        let pos = self.convert_to_gui_space(pos);
         self.ui
             .painter()
             .text(pos, anchor, text, font_id, text_color);
