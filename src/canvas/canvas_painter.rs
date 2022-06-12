@@ -3,7 +3,7 @@ use std::ops::DerefMut;
 use std::rc::Rc;
 
 use eframe::egui::Vec2 as GuiVec;
-use eframe::egui::{Color32, Painter, Pos2, Rect, Response as EGuiResponse, Stroke, Ui};
+use eframe::egui::{Color32, Pos2, Rect, Response as EGuiResponse, Stroke, Ui};
 use eframe::emath::Align2;
 use eframe::epaint::FontId;
 use simple_math::{Rectangle, Vec2};
@@ -142,7 +142,7 @@ impl Position {
 
 ///mirrors the guidd
 pub struct CanvasHandle<'p> {
-    painter: &'p Painter,
+    ui: &'p Ui,
     current_cutout: Rect,
     gui_space: Rect,
     aspect_ratio: f32,
@@ -156,7 +156,7 @@ impl<'p> CanvasHandle<'p> {
         aspect_ratio: f32,
     ) -> CanvasHandle {
         CanvasHandle {
-            painter: ui.painter(),
+            ui,
             current_cutout,
             gui_space,
             aspect_ratio,
@@ -180,7 +180,7 @@ impl<'p> CanvasHandle<'p> {
     }
 
     pub fn bounding_box(&self) -> Rectangle {
-        let gui_rect = self.painter.clip_rect();
+        let gui_rect = self.ui.painter().clip_rect();
         Rectangle::new(gui_rect.max.into(), gui_rect.min.into())
     }
 
@@ -193,12 +193,12 @@ impl<'p> CanvasHandle<'p> {
                 .1
                 .to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio),
         ];
-        self.painter.line_segment(points, stroke);
+        self.ui.painter().line_segment(points, stroke);
     }
 
     pub fn circle_filled(&mut self, center: Position, radius: f32, fill_color: impl Into<Color32>) {
         let center = center.to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio);
-        self.painter.circle_filled(center, radius, fill_color);
+        self.ui.painter().circle_filled(center, radius, fill_color);
     }
 
     pub fn text(
@@ -210,15 +210,22 @@ impl<'p> CanvasHandle<'p> {
         text_color: Color32,
     ) {
         let pos = pos.to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio);
-        self.painter.text(pos, anchor, text, font_id, text_color);
+        self.ui
+            .painter()
+            .text(pos, anchor, text, font_id, text_color);
     }
 
     pub fn text_size(&self, text: impl ToString, font_id: FontId) -> Vec2 {
         //color is just a dummy value
         let gally = self
-            .painter
+            .ui
+            .painter()
             .layout_no_wrap(text.to_string(), font_id, Color32::BLACK);
         gally.size().into()
+    }
+
+    pub fn request_repaint(&self) {
+        self.ui.ctx().request_repaint();
     }
 }
 
