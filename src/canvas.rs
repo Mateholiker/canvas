@@ -6,7 +6,7 @@ use eframe::egui::{vec2, Color32, Key, Rect, Response, Sense, Ui, Widget};
 use eframe::epaint::{FontId, Rounding};
 
 pub mod canvas_painter;
-use canvas_painter::{CanvasPainter, Drawable, Position};
+use canvas_painter::{CanvasHandle, Drawable, Position, Response as CustomResponse};
 
 pub struct CanvasState {
     draw_data: Box<dyn Drawable>,
@@ -177,6 +177,17 @@ impl<'s> Canvas<'s> {
                 }
             }
         }
+
+        let response = CustomResponse::from(response);
+        let canvas_handle = CanvasHandle::new(
+            ui,
+            self.state.current_cutout,
+            gui_space,
+            self.state.aspect_ratio,
+        );
+
+        //pass through
+        self.state.draw_data.handle_input(&response, &canvas_handle);
     }
 }
 
@@ -188,13 +199,13 @@ impl<'s> Widget for Canvas<'s> {
         let painter = ui.painter();
 
         //draw the Drawable Data
-        let canvas_painter = CanvasPainter::new(
+        let mut canvas_handle = CanvasHandle::new(
             ui,
             self.state.current_cutout,
             gui_space,
             self.state.aspect_ratio,
         );
-        self.state.draw_data.draw(&canvas_painter);
+        self.state.draw_data.draw(&mut canvas_handle);
 
         //manage user input
         self.manage_user_input(ui, gui_space, &response);

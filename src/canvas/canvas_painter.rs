@@ -3,7 +3,7 @@ use std::ops::DerefMut;
 use std::rc::Rc;
 
 use eframe::egui::Vec2 as GuiVec;
-use eframe::egui::{Color32, Context, Painter, Pos2, Rect, Response, Stroke, Ui};
+use eframe::egui::{Color32, Painter, Pos2, Rect, Response as EGuiResponse, Stroke, Ui};
 use eframe::emath::Align2;
 use eframe::epaint::FontId;
 use simple_math::{Rectangle, Vec2};
@@ -141,21 +141,21 @@ impl Position {
 }
 
 ///mirrors the guidd
-pub struct CanvasPainter<'p> {
+pub struct CanvasHandle<'p> {
     painter: &'p Painter,
     current_cutout: Rect,
     gui_space: Rect,
     aspect_ratio: f32,
 }
 
-impl<'p> CanvasPainter<'p> {
+impl<'p> CanvasHandle<'p> {
     pub(super) fn new(
         ui: &Ui,
         current_cutout: Rect,
         gui_space: Rect,
         aspect_ratio: f32,
-    ) -> CanvasPainter {
-        CanvasPainter {
+    ) -> CanvasHandle {
+        CanvasHandle {
             painter: ui.painter(),
             current_cutout,
             gui_space,
@@ -184,7 +184,7 @@ impl<'p> CanvasPainter<'p> {
         Rectangle::new(gui_rect.max.into(), gui_rect.min.into())
     }
 
-    pub fn line_segment(&self, points: (Position, Position), stroke: impl Into<Stroke>) {
+    pub fn line_segment(&mut self, points: (Position, Position), stroke: impl Into<Stroke>) {
         let points = [
             points
                 .0
@@ -196,13 +196,13 @@ impl<'p> CanvasPainter<'p> {
         self.painter.line_segment(points, stroke);
     }
 
-    pub fn circle_filled(&self, center: Position, radius: f32, fill_color: impl Into<Color32>) {
+    pub fn circle_filled(&mut self, center: Position, radius: f32, fill_color: impl Into<Color32>) {
         let center = center.to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio);
         self.painter.circle_filled(center, radius, fill_color);
     }
 
     pub fn text(
-        &self,
+        &mut self,
         pos: Position,
         anchor: Align2,
         text: impl ToString,
@@ -222,22 +222,36 @@ impl<'p> CanvasPainter<'p> {
     }
 }
 
+pub struct Response {
+    pub curser_pos: Option<Position>,
+    pub clicked: bool,
+}
+
+impl From<&EGuiResponse> for Response {
+    fn from(response: &EGuiResponse) -> Self {
+        Response {
+            curser_pos: response.hover_pos().map(Position::Gui),
+            clicked: response.clicked(),
+        }
+    }
+}
+
 pub trait Drawable {
-    fn draw(&mut self, painter: &CanvasPainter);
+    fn draw(&mut self, handle: &mut CanvasHandle);
 
     fn get_cutout(&mut self) -> Rect;
 
     #[allow(unused_variables)]
-    fn handle_input(&mut self, ctx: &Context, response: &Response) {}
+    fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {}
 }
 
 impl<T> Drawable for Vec<T>
 where
     T: Drawable,
 {
-    fn draw(&mut self, painter: &CanvasPainter) {
+    fn draw(&mut self, handle: &mut CanvasHandle) {
         for drawable in self {
-            drawable.draw(painter);
+            drawable.draw(handle);
         }
     }
 
@@ -255,15 +269,15 @@ where
     }
 
     #[allow(unused_variables)]
-    fn handle_input(&mut self, ctx: &Context, response: &Response) {
+    fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {
         for drawable in self {
-            drawable.handle_input(ctx, response);
+            drawable.handle_input(response, handle);
         }
     }
 }
 
 impl Drawable for () {
-    fn draw(&mut self, _painter: &CanvasPainter) {}
+    fn draw(&mut self, _handle: &mut CanvasHandle) {}
 
     fn get_cutout(&mut self) -> Rect {
         //dummy value
@@ -275,9 +289,9 @@ impl<T> Drawable for Rc<RefCell<T>>
 where
     T: Drawable,
 {
-    fn draw(&mut self, painter: &CanvasPainter) {
+    fn draw(&mut self, handle: &mut CanvasHandle) {
         let mut borrow = self.borrow_mut();
-        borrow.draw(painter);
+        borrow.draw(handle);
     }
 
     fn get_cutout(&mut self) -> Rect {
@@ -285,9 +299,9 @@ where
         borrow.get_cutout()
     }
 
-    fn handle_input(&mut self, ctx: &Context, response: &Response) {
+    fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {
         let mut borrow = self.borrow_mut();
-        borrow.handle_input(ctx, response);
+        borrow.handle_input(response, handle);
     }
 }
 
@@ -295,16 +309,16 @@ impl<T> Drawable for Box<T>
 where
     T: Drawable,
 {
-    fn draw(&mut self, painter: &CanvasPainter) {
-        self.deref_mut().draw(painter);
+    fn draw(&mut self, handle: &mut CanvasHandle) {
+        self.deref_mut().draw(handle);
     }
 
     fn get_cutout(&mut self) -> Rect {
         self.deref_mut().get_cutout()
     }
 
-    fn handle_input(&mut self, ctx: &Context, response: &Response) {
-        self.deref_mut().handle_input(ctx, response);
+    fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {
+        self.deref_mut().handle_input(response, handle);
     }
 }
 
@@ -313,9 +327,9 @@ where
     T: Drawable,
     G: Drawable,
 {
-    fn draw(&mut self, painter: &CanvasPainter) {
-        self.0.draw(painter);
-        self.1.draw(painter);
+    fn draw(&mut self, handle: &mut CanvasHandle) {
+        self.0.draw(handle);
+        self.1.draw(handle);
     }
 
     fn get_cutout(&mut self) -> Rect {
@@ -326,8 +340,8 @@ where
     }
 
     #[allow(unused_variables)]
-    fn handle_input(&mut self, ctx: &Context, response: &Response) {
-        self.0.handle_input(ctx, response);
-        self.1.handle_input(ctx, response);
+    fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {
+        self.0.handle_input(response, handle);
+        self.1.handle_input(response, handle);
     }
 }
