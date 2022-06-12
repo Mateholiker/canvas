@@ -5,8 +5,14 @@ use eframe::egui::{vec2, Color32, Key, Rect, Response, Sense, Ui, Widget};
 
 use eframe::epaint::{FontId, Rounding};
 
-pub mod canvas_painter;
-use canvas_painter::{CanvasHandle, Drawable, Position, Response as CustomResponse};
+pub mod canvas_handle;
+pub mod drawable;
+pub mod position;
+use canvas_handle::CanvasHandle;
+use drawable::Response as CustomResponse;
+use position::Position;
+
+use crate::Drawable;
 
 pub struct CanvasState {
     draw_data: Box<dyn Drawable>,
