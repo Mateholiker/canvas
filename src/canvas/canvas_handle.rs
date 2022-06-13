@@ -107,4 +107,9 @@ impl<'p> CanvasHandle<'p> {
     pub fn request_repaint(&self) {
         self.ui.ctx().request_repaint();
     }
+
+    ///returns the time in seconds relatvie to something
+    pub fn time(&self) -> f64 {
+        self.ui.ctx().input().time
+    }
 }
