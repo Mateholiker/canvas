@@ -50,7 +50,7 @@ impl CanvasState {
         &mut self.draw_data
     }
 
-    fn reset_cutout(&mut self) {
+    pub fn reset_cutout(&mut self) {
         self.current_cutout = self.draw_data.get_cutout();
     }
 }
