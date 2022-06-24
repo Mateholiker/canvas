@@ -112,4 +112,8 @@ impl<'p> CanvasHandle<'p> {
     pub fn time(&self) -> f64 {
         self.ui.ctx().input().time
     }
+
+    pub fn cursor_pos(&self) -> Option<Position> {
+        self.ui.ctx().input().pointer.hover_pos().map(Position::Gui)
+    }
 }
