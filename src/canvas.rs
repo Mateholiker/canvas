@@ -22,7 +22,7 @@ pub struct CanvasState {
 }
 
 impl CanvasState {
-    pub fn new(aspect_ratio: f32) -> CanvasState {
+    pub fn new() -> CanvasState {
         use CanvasMode::Normal;
 
         let mut draw_data = Box::new(());
@@ -32,12 +32,16 @@ impl CanvasState {
             draw_data,
             current_cutout: default_cutout,
             mode: Normal,
-            aspect_ratio,
+            aspect_ratio: 1.0,
         }
     }
 
     pub fn set_draw_data(&mut self, draw_data: Box<dyn Drawable>) {
         self.draw_data = draw_data;
+    }
+
+    pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
+        self.aspect_ratio = aspect_ratio;
     }
 
     pub fn take_draw_data(&mut self) -> Box<dyn Drawable> {
@@ -57,7 +61,7 @@ impl CanvasState {
 
 impl Default for CanvasState {
     fn default() -> Self {
-        CanvasState::new(1.0)
+        CanvasState::new()
     }
 }
 
