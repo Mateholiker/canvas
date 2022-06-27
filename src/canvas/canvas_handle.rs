@@ -1,13 +1,14 @@
-use eframe::egui::{Color32, Rect, Stroke, Ui};
+use eframe::egui::{Color32, Image, Rect, Stroke, Ui};
 use eframe::emath::{Align2, Pos2};
 use eframe::epaint::{FontId, Rounding};
+use egui_extras::RetainedImage;
 use simple_math::{Rectangle, Vec2};
 
 use crate::Position;
 
 ///mirrors the guidd
 pub struct CanvasHandle<'p> {
-    ui: &'p Ui,
+    ui: &'p mut Ui,
     current_cutout: Rect,
     gui_space: Rect,
     aspect_ratio: f32,
@@ -15,7 +16,7 @@ pub struct CanvasHandle<'p> {
 
 impl<'p> CanvasHandle<'p> {
     pub(super) fn new(
-        ui: &Ui,
+        ui: &mut Ui,
         current_cutout: Rect,
         gui_space: Rect,
         aspect_ratio: f32,
@@ -115,5 +116,19 @@ impl<'p> CanvasHandle<'p> {
 
     pub fn cursor_pos(&self) -> Option<Position> {
         self.ui.ctx().input().pointer.hover_pos().map(Position::Gui)
+    }
+
+    pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
+        self.aspect_ratio = aspect_ratio
+    }
+
+    pub fn image(&mut self, image: RetainedImage, corner_a: Position, corner_b: Position) {
+        let a = self.convert_to_gui_space(corner_a);
+        let b = self.convert_to_gui_space(corner_b);
+
+        let [x, y] = image.size();
+        let image = Image::new(image.texture_id(self.ui.ctx()), (x as f32, y as f32));
+
+        image.paint_at(self.ui, Rect::from_two_pos(a, b));
     }
 }

@@ -80,7 +80,7 @@ impl<'s> Canvas<'s> {
         Canvas { state }
     }
 
-    fn manage_user_input(&mut self, ui: &Ui, gui_space: Rect, response: &Response) {
+    fn manage_user_input(&mut self, ui: &mut Ui, gui_space: Rect, response: &Response) {
         use CanvasMode::{Dragging, Normal};
         use Key::Space;
 
@@ -187,6 +187,7 @@ impl<'s> Canvas<'s> {
                 }
             }
         }
+        drop(input);
 
         let response = CustomResponse::from(response);
         let canvas_handle = CanvasHandle::new(
@@ -206,7 +207,6 @@ impl<'s> Widget for Canvas<'s> {
         let response = ui.allocate_response(vec2(50.0, 50.0), Sense::click_and_drag());
         let gui_space = response.rect;
         ui.set_clip_rect(gui_space);
-        let painter = ui.painter();
 
         //draw the Drawable Data
         let mut canvas_handle = CanvasHandle::new(
@@ -221,6 +221,7 @@ impl<'s> Widget for Canvas<'s> {
         self.manage_user_input(ui, gui_space, &response);
 
         //draw a frame around the Trajectories
+        let painter = ui.painter();
         painter.rect_stroke(gui_space, 0.0, (5.0, Color32::DARK_RED));
 
         response
