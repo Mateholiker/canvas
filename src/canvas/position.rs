@@ -124,14 +124,16 @@ impl Position {
             // y-Axe is limiting
             scaling_factor =
                 gui_space.shrink(MIN_PADDING).height() / (current_cutout.height() * y_stretch);
-            x_padding = (gui_space.width() - current_cutout.width() * scaling_factor) / 2.0;
+            x_padding =
+                (gui_space.width() - current_cutout.width() * scaling_factor * x_stretch) / 2.0;
             y_padding = MIN_PADDING;
         } else {
             // x-Axe is limiting
             scaling_factor =
                 gui_space.shrink(MIN_PADDING).width() / (current_cutout.width() * x_stretch);
             x_padding = MIN_PADDING;
-            y_padding = (gui_space.height() - current_cutout.height() * scaling_factor) / 2.0;
+            y_padding =
+                (gui_space.height() - current_cutout.height() * scaling_factor * y_stretch) / 2.0;
         }
         let x_scaling_factor = scaling_factor * x_stretch;
         let y_scaling_factor = scaling_factor * y_stretch;
