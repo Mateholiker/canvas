@@ -131,4 +131,17 @@ impl<'p> CanvasHandle<'p> {
 
         image.paint_at(self.ui, Rect::from_two_pos(a, b));
     }
+
+    /// returs the Rectangle in the canvas space that is currently visual
+    /// in general, this is not equal to the current cutout
+    /// but bigger in one dimension
+    pub fn get_draw_region_in_canvas_space(&self) -> Rectangle {
+        let corner_a = Position::Gui(self.gui_space.min);
+        let corner_b = Position::Gui(self.gui_space.max);
+
+        let corner_a = self.convert_to_gui_space(corner_a).into();
+        let corner_b = self.convert_to_gui_space(corner_b).into();
+
+        Rectangle::new(corner_a, corner_b)
+    }
 }
