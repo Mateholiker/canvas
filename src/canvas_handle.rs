@@ -139,8 +139,8 @@ impl<'p> CanvasHandle<'p> {
         let corner_a = Position::Gui(self.gui_space.min);
         let corner_b = Position::Gui(self.gui_space.max);
 
-        let corner_a = self.convert_to_gui_space(corner_a).into();
-        let corner_b = self.convert_to_gui_space(corner_b).into();
+        let corner_a = self.convert_to_canvas_space(corner_a).get_raw_pos().into();
+        let corner_b = self.convert_to_canvas_space(corner_b).get_raw_pos().into();
 
         Rectangle::new(corner_a, corner_b)
     }
