@@ -122,7 +122,7 @@ impl<'p> CanvasHandle<'p> {
         self.aspect_ratio = aspect_ratio
     }
 
-    pub fn image(&mut self, image: RetainedImage, corner_a: Position, corner_b: Position) {
+    pub fn image(&mut self, image: &RetainedImage, corner_a: Position, corner_b: Position) {
         let a = self.convert_to_gui_space(corner_a);
         let b = self.convert_to_gui_space(corner_b);
 
