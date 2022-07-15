@@ -144,4 +144,9 @@ impl<'p> CanvasHandle<'p> {
 
         Rectangle::new(corner_a, corner_b)
     }
+
+    pub fn dark_mode(&self) -> bool {
+        self.ui.style().visuals.dark_mode
+    }
+
 }
