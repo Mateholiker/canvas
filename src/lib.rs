@@ -1,5 +1,3 @@
-use std::mem::swap;
-
 use eframe::egui::Vec2 as GuiVec;
 use eframe::egui::{vec2, Color32, Key, Rect, Response as EguiResponse, Sense, Ui, Widget};
 
@@ -14,9 +12,9 @@ pub use drawable::{Drawable, Response};
 pub use position::Position;
 
 pub struct CanvasState {
-    draw_data: Box<dyn Drawable>,
     current_cutout: Rect,
     mode: CanvasMode,
+    draw_frame: bool,
     aspect_ratio: f32,
 }
 
@@ -24,37 +22,27 @@ impl CanvasState {
     pub fn new() -> CanvasState {
         use CanvasMode::Normal;
 
-        let mut draw_data = Box::new(());
-        let default_cutout = draw_data.get_cutout();
+        let default_cutout = ().get_cutout();
 
         CanvasState {
-            draw_data,
             current_cutout: default_cutout,
             mode: Normal,
+            draw_frame: false,
             aspect_ratio: 1.0,
         }
     }
 
-    pub fn set_draw_data(&mut self, draw_data: Box<dyn Drawable>) {
-        self.draw_data = draw_data;
+    pub fn draw_frame(mut self, enabled: bool) -> Self {
+        self.draw_frame = enabled;
+        self
     }
 
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
         self.aspect_ratio = aspect_ratio;
     }
 
-    pub fn take_draw_data(&mut self) -> Box<dyn Drawable> {
-        let mut draw_data: Box<dyn Drawable> = Box::new(());
-        swap(&mut draw_data, &mut self.draw_data);
-        draw_data
-    }
-
-    pub fn draw_data_mut(&mut self) -> &mut Box<dyn Drawable> {
-        &mut self.draw_data
-    }
-
-    pub fn reset_cutout(&mut self) {
-        self.current_cutout = self.draw_data.get_cutout();
+    fn reset_cutout<D: Drawable>(&mut self, drawable: &mut D) {
+        self.current_cutout = drawable.get_cutout();
     }
 }
 
@@ -64,19 +52,24 @@ impl Default for CanvasState {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CanvasMode {
     Dragging,
     Normal,
 }
 
-pub struct Canvas<'s> {
+pub struct Canvas<'s, D: Drawable> {
     state: &'s mut CanvasState,
+    draw_data: &'s mut D,
 }
 
-impl<'s> Canvas<'s> {
-    pub fn new(state: &'s mut CanvasState) -> Canvas<'s> {
-        Canvas { state }
+impl<'s, D: Drawable> Canvas<'s, D> {
+    pub fn new(state: &'s mut CanvasState, draw_data: &'s mut D) -> Canvas<'s, D> {
+        Canvas { state, draw_data }
+    }
+
+    pub fn reset_cutout(&mut self) {
+        self.state.reset_cutout(self.draw_data)
     }
 
     fn manage_user_input(&mut self, ui: &mut Ui, gui_space: Rect, response: &EguiResponse) {
@@ -115,7 +108,7 @@ impl<'s> Canvas<'s> {
             Normal => {
                 //reseting
                 if input.key_pressed(Space) {
-                    self.state.reset_cutout();
+                    self.reset_cutout();
                 }
 
                 //zooming
@@ -197,11 +190,11 @@ impl<'s> Canvas<'s> {
         );
 
         //pass through
-        self.state.draw_data.handle_input(&response, &canvas_handle);
+        self.draw_data.handle_input(&response, &canvas_handle);
     }
 }
 
-impl<'s> Widget for Canvas<'s> {
+impl<'s, D: Drawable> Widget for Canvas<'s, D> {
     fn ui(mut self, ui: &mut Ui) -> EguiResponse {
         let response = ui.allocate_response(vec2(50.0, 50.0), Sense::click_and_drag());
         let gui_space = response.rect;
@@ -214,14 +207,16 @@ impl<'s> Widget for Canvas<'s> {
             gui_space,
             self.state.aspect_ratio,
         );
-        self.state.draw_data.draw(&mut canvas_handle);
+        self.draw_data.draw(&mut canvas_handle);
 
         //manage user input
         self.manage_user_input(ui, gui_space, &response);
 
-        //draw a frame around the Trajectories
-        let painter = ui.painter();
-        painter.rect_stroke(gui_space, 0.0, (5.0, Color32::DARK_RED));
+        if self.state.draw_frame {
+            //draw a frame around the Trajectories
+            let painter = ui.painter();
+            painter.rect_stroke(gui_space, 0.0, (5.0, Color32::DARK_RED));
+        }
 
         response
     }
