@@ -6,7 +6,7 @@ use simple_math::{Rectangle, Vec2};
 
 use crate::Position;
 
-///mirrors the guidd
+///mirrors the gui
 pub struct CanvasHandle<'p> {
     ui: &'p mut Ui,
     current_cutout: Rect,
