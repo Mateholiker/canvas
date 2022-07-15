@@ -15,6 +15,24 @@ pub trait Drawable {
     fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {}
 }
 
+impl<T> Drawable for &mut T
+where
+    T: Drawable,
+{
+    fn draw(&mut self, handle: &mut CanvasHandle) {
+        (*self).draw(handle);
+    }
+
+    fn get_cutout(&mut self) -> Rect {
+        (*self).get_cutout()
+    }
+
+    fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {
+        (*self).handle_input(response, handle);
+    }
+
+}
+
 impl<T> Drawable for Vec<T>
 where
     T: Drawable,
