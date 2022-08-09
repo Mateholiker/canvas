@@ -7,6 +7,12 @@ mod canvas_handle;
 mod drawable;
 mod position;
 
+mod utility {
+    pub mod coordinate_system;
+}
+
+pub use utility::coordinate_system::{Alignment, Axis, CoordinateSystem, Placement, Tick};
+
 pub use canvas_handle::CanvasHandle;
 pub use drawable::{Drawable, Response};
 pub use position::Position;
