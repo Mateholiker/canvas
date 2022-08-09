@@ -148,5 +148,4 @@ impl<'p> CanvasHandle<'p> {
     pub fn dark_mode(&self) -> bool {
         self.ui.style().visuals.dark_mode
     }
-
 }
