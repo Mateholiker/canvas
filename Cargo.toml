@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 eframe = "0.18"
-simple_math = { git = "https://github.com/Mateholiker/simple_math" }
 egui_extras = { version = "0.18", features = ["image"]}
+simple_math = { git = "https://github.com/Mateholiker/simple_math" }
 #simple_math = { path = "/home/jan/programming/rust/simple_math" }

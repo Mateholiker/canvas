@@ -22,7 +22,7 @@ impl CanvasState {
     pub fn new() -> CanvasState {
         use CanvasMode::Normal;
 
-        let default_cutout = ().get_cutout();
+        let default_cutout = ().get_cutout(&());
 
         CanvasState {
             current_cutout: default_cutout,
@@ -41,8 +41,11 @@ impl CanvasState {
         self.aspect_ratio = aspect_ratio;
     }
 
-    fn reset_cutout<D: Drawable>(&mut self, drawable: &mut D) {
-        self.current_cutout = drawable.get_cutout();
+    fn reset_cutout<D, E>(&mut self, drawable: &mut E, draw_data: &D)
+    where
+        E: Drawable<DrawData = D>,
+    {
+        self.current_cutout = drawable.get_cutout(draw_data);
     }
 }
 
@@ -58,18 +61,27 @@ enum CanvasMode {
     Normal,
 }
 
-pub struct Canvas<'s, D: Drawable> {
+pub struct Canvas<'s, D, E: Drawable<DrawData = D>> {
     state: &'s mut CanvasState,
-    draw_data: &'s mut D,
+    drawable: &'s mut E,
+    draw_data: &'s D,
 }
 
-impl<'s, D: Drawable> Canvas<'s, D> {
-    pub fn new(state: &'s mut CanvasState, draw_data: &'s mut D) -> Canvas<'s, D> {
-        Canvas { state, draw_data }
+impl<'s, D, E: Drawable<DrawData = D>> Canvas<'s, D, E> {
+    pub fn new(
+        state: &'s mut CanvasState,
+        drawable: &'s mut E,
+        draw_data: &'s D,
+    ) -> Canvas<'s, D, E> {
+        Canvas {
+            state,
+            drawable,
+            draw_data,
+        }
     }
 
     pub fn reset_cutout(&mut self) {
-        self.state.reset_cutout(self.draw_data)
+        self.state.reset_cutout(self.drawable, self.draw_data)
     }
 
     fn manage_user_input(&mut self, ui: &mut Ui, gui_space: Rect, response: &EguiResponse) {
@@ -190,11 +202,11 @@ impl<'s, D: Drawable> Canvas<'s, D> {
         );
 
         //pass through
-        self.draw_data.handle_input(&response, &canvas_handle);
+        self.drawable.handle_input(&response, &canvas_handle);
     }
 }
 
-impl<'s, D: Drawable> Widget for Canvas<'s, D> {
+impl<'s, D, E: Drawable<DrawData = D>> Widget for Canvas<'s, D, E> {
     fn ui(mut self, ui: &mut Ui) -> EguiResponse {
         let response = ui.allocate_response(vec2(50.0, 50.0), Sense::click_and_drag());
         let gui_space = response.rect;
@@ -207,7 +219,7 @@ impl<'s, D: Drawable> Widget for Canvas<'s, D> {
             gui_space,
             self.state.aspect_ratio,
         );
-        self.draw_data.draw(&mut canvas_handle);
+        self.drawable.draw(&mut canvas_handle, self.draw_data);
 
         //manage user input
         self.manage_user_input(ui, gui_space, &response);

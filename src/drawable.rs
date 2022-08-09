@@ -7,47 +7,52 @@ use eframe::egui::{Rect, Response as EGuiResponse};
 use crate::{CanvasHandle, Position};
 
 pub trait Drawable {
-    fn draw(&mut self, handle: &mut CanvasHandle);
+    type DrawData;
 
-    fn get_cutout(&mut self) -> Rect;
+    fn draw(&mut self, handle: &mut CanvasHandle, draw_data: &Self::DrawData);
+
+    fn get_cutout(&mut self, draw_data: &Self::DrawData) -> Rect;
 
     #[allow(unused_variables)]
     fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {}
 }
 
-impl<T> Drawable for &mut T
+impl<T, D> Drawable for &mut T
 where
-    T: Drawable,
+    T: Drawable<DrawData = D>,
 {
-    fn draw(&mut self, handle: &mut CanvasHandle) {
-        (*self).draw(handle);
+    type DrawData = D;
+
+    fn draw(&mut self, handle: &mut CanvasHandle, draw_data: &Self::DrawData) {
+        (*self).draw(handle, draw_data);
     }
 
-    fn get_cutout(&mut self) -> Rect {
-        (*self).get_cutout()
+    fn get_cutout(&mut self, draw_data: &Self::DrawData) -> Rect {
+        (*self).get_cutout(draw_data)
     }
 
     fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {
         (*self).handle_input(response, handle);
     }
-
 }
 
-impl<T> Drawable for Vec<T>
+impl<T, D> Drawable for Vec<T>
 where
-    T: Drawable,
+    T: Drawable<DrawData = D>,
 {
-    fn draw(&mut self, handle: &mut CanvasHandle) {
+    type DrawData = D;
+
+    fn draw(&mut self, handle: &mut CanvasHandle, draw_data: &Self::DrawData) {
         for drawable in self {
-            drawable.draw(handle);
+            drawable.draw(handle, draw_data);
         }
     }
 
-    fn get_cutout(&mut self) -> Rect {
+    fn get_cutout(&mut self, draw_data: &Self::DrawData) -> Rect {
         if let Some(first) = self.first_mut() {
-            let mut rect = first.get_cutout();
-            for drawable in self {
-                rect = rect.union(drawable.get_cutout());
+            let mut rect = first.get_cutout(draw_data);
+            for drawable in self.iter_mut().skip(1) {
+                rect = rect.union(drawable.get_cutout(draw_data));
             }
             rect
         } else {
@@ -65,26 +70,30 @@ where
 }
 
 impl Drawable for () {
-    fn draw(&mut self, _handle: &mut CanvasHandle) {}
+    type DrawData = ();
 
-    fn get_cutout(&mut self) -> Rect {
+    fn draw(&mut self, _handle: &mut CanvasHandle, _draw_data: &Self::DrawData) {}
+
+    fn get_cutout(&mut self, _draw_data: &Self::DrawData) -> Rect {
         //dummy value
         Rect::from_two_pos((0.0, 0.0).into(), (10.0, 10.0).into())
     }
 }
 
-impl<T> Drawable for Rc<RefCell<T>>
+impl<T, D> Drawable for Rc<RefCell<T>>
 where
-    T: Drawable,
+    T: Drawable<DrawData = D>,
 {
-    fn draw(&mut self, handle: &mut CanvasHandle) {
+    type DrawData = D;
+
+    fn draw(&mut self, handle: &mut CanvasHandle, draw_data: &Self::DrawData) {
         let mut borrow = self.borrow_mut();
-        borrow.draw(handle);
+        borrow.draw(handle, draw_data);
     }
 
-    fn get_cutout(&mut self) -> Rect {
+    fn get_cutout(&mut self, draw_data: &Self::DrawData) -> Rect {
         let mut borrow = self.borrow_mut();
-        borrow.get_cutout()
+        borrow.get_cutout(draw_data)
     }
 
     fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {
@@ -93,16 +102,18 @@ where
     }
 }
 
-impl<T> Drawable for Box<T>
+impl<T, D> Drawable for Box<T>
 where
-    T: Drawable,
+    T: Drawable<DrawData = D>,
 {
-    fn draw(&mut self, handle: &mut CanvasHandle) {
-        self.deref_mut().draw(handle);
+    type DrawData = D;
+
+    fn draw(&mut self, handle: &mut CanvasHandle, draw_data: &Self::DrawData) {
+        self.deref_mut().draw(handle, draw_data);
     }
 
-    fn get_cutout(&mut self) -> Rect {
-        self.deref_mut().get_cutout()
+    fn get_cutout(&mut self, draw_data: &Self::DrawData) -> Rect {
+        self.deref_mut().get_cutout(draw_data)
     }
 
     fn handle_input(&mut self, response: &Response, handle: &CanvasHandle) {
@@ -110,19 +121,21 @@ where
     }
 }
 
-impl<T, G> Drawable for (T, G)
+impl<T, G, D> Drawable for (T, G)
 where
-    T: Drawable,
-    G: Drawable,
+    T: Drawable<DrawData = D>,
+    G: Drawable<DrawData = D>,
 {
-    fn draw(&mut self, handle: &mut CanvasHandle) {
-        self.0.draw(handle);
-        self.1.draw(handle);
+    type DrawData = D;
+
+    fn draw(&mut self, handle: &mut CanvasHandle, draw_data: &Self::DrawData) {
+        self.0.draw(handle, draw_data);
+        self.1.draw(handle, draw_data);
     }
 
-    fn get_cutout(&mut self) -> Rect {
-        let rect0 = self.0.get_cutout();
-        let rect1 = self.1.get_cutout();
+    fn get_cutout(&mut self, draw_data: &Self::DrawData) -> Rect {
+        let rect0 = self.0.get_cutout(draw_data);
+        let rect1 = self.1.get_cutout(draw_data);
 
         rect0.union(rect1)
     }
