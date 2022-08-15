@@ -90,13 +90,18 @@ impl<'s, D, E: Drawable<DrawData = D>> Canvas<'s, D, E> {
         self.state.reset_cutout(self.drawable, self.draw_data)
     }
 
-    fn manage_user_input(&mut self, ui: &mut Ui, gui_space: Rect, response: &EguiResponse) {
+    fn manage_user_input(
+        &mut self,
+        ui: &mut Ui,
+        gui_space: Rect,
+        egui_response: &mut EguiResponse,
+    ) {
         use CanvasMode::{Dragging, Normal};
         use Key::Space;
 
         //draw curser position
         let painter = ui.painter();
-        if let Some(curser_gui_pos) = response.hover_pos() {
+        if let Some(curser_gui_pos) = egui_response.hover_pos() {
             let position = Position::Gui(curser_gui_pos);
             let curser_canvas_pos = position.to_canvas_space(
                 gui_space,
@@ -131,7 +136,7 @@ impl<'s, D, E: Drawable<DrawData = D>> Canvas<'s, D, E> {
 
                 //zooming
                 if input.scroll_delta.y.abs() > 1.0 {
-                    if let Some(curser_gui_pos) = response.hover_pos() {
+                    if let Some(curser_gui_pos) = egui_response.hover_pos() {
                         //calulate the curser position in trajectory space
                         //this is the fix_point of the new cutout
                         //this means its relative position must not change
@@ -163,8 +168,8 @@ impl<'s, D, E: Drawable<DrawData = D>> Canvas<'s, D, E> {
                 }
 
                 //drag detection
-                if response.drag_started() {
-                    if let Some(hover_pos) = response.hover_pos() {
+                if egui_response.drag_started() {
+                    if let Some(hover_pos) = egui_response.hover_pos() {
                         if gui_space.contains(hover_pos) {
                             //drag started
                             self.state.mode = Dragging;
@@ -175,7 +180,7 @@ impl<'s, D, E: Drawable<DrawData = D>> Canvas<'s, D, E> {
 
             Dragging => {
                 //change cutout
-                if response.drag_released() {
+                if egui_response.drag_released() {
                     self.state.mode = Normal;
                 } else {
                     let (_padding, scaling_factor) = Position::calculate_padding_and_scaling_factor(
@@ -183,7 +188,7 @@ impl<'s, D, E: Drawable<DrawData = D>> Canvas<'s, D, E> {
                         self.state.current_cutout,
                         self.state.aspect_ratio,
                     );
-                    let translation_raw = response.drag_delta();
+                    let translation_raw = egui_response.drag_delta();
                     let translation_scaled = GuiVec {
                         x: translation_raw.x / scaling_factor.x(),
                         y: translation_raw.y / scaling_factor.y(),
@@ -199,9 +204,10 @@ impl<'s, D, E: Drawable<DrawData = D>> Canvas<'s, D, E> {
         }
         drop(input);
 
-        let response = Response::from(response);
+        let response = Response::from(&*egui_response);
         let canvas_handle = CanvasHandle::new(
             ui,
+            egui_response,
             self.state.current_cutout,
             gui_space,
             self.state.aspect_ratio,
@@ -214,13 +220,14 @@ impl<'s, D, E: Drawable<DrawData = D>> Canvas<'s, D, E> {
 
 impl<'s, D, E: Drawable<DrawData = D>> Widget for Canvas<'s, D, E> {
     fn ui(mut self, ui: &mut Ui) -> EguiResponse {
-        let response = ui.allocate_response(vec2(50.0, 50.0), Sense::click_and_drag());
+        let mut response = ui.allocate_response(vec2(50.0, 50.0), Sense::click_and_drag());
         let gui_space = response.rect;
         ui.set_clip_rect(gui_space);
 
         //draw the Drawable Data
         let mut canvas_handle = CanvasHandle::new(
             ui,
+            &mut response,
             self.state.current_cutout,
             gui_space,
             self.state.aspect_ratio,
@@ -228,7 +235,7 @@ impl<'s, D, E: Drawable<DrawData = D>> Widget for Canvas<'s, D, E> {
         self.drawable.draw(&mut canvas_handle, self.draw_data);
 
         //manage user input
-        self.manage_user_input(ui, gui_space, &response);
+        self.manage_user_input(ui, gui_space, &mut response);
 
         if self.state.draw_frame {
             //draw a frame around the Trajectories

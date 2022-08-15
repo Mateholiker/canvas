@@ -1,7 +1,8 @@
-use eframe::egui::{Color32, Image, Rect, Stroke, Ui};
+use eframe::egui::{Color32, Image, Rect, Response as EguiResponse, Stroke, Ui};
 use eframe::emath::{Align2, Pos2};
 use eframe::epaint::{FontId, Rounding};
 use egui_extras::RetainedImage;
+use replace_with::replace_with_or_abort;
 use simple_math::{Rectangle, Vec2};
 
 use crate::Position;
@@ -9,6 +10,7 @@ use crate::Position;
 ///mirrors the gui
 pub struct CanvasHandle<'p> {
     ui: &'p mut Ui,
+    response: &'p mut EguiResponse,
     current_cutout: Rect,
     gui_space: Rect,
     aspect_ratio: f32,
@@ -16,13 +18,15 @@ pub struct CanvasHandle<'p> {
 
 impl<'p> CanvasHandle<'p> {
     pub(super) fn new(
-        ui: &mut Ui,
+        ui: &'p mut Ui,
+        response: &'p mut EguiResponse,
         current_cutout: Rect,
         gui_space: Rect,
         aspect_ratio: f32,
     ) -> CanvasHandle {
         CanvasHandle {
             ui,
+            response,
             current_cutout,
             gui_space,
             aspect_ratio,
@@ -130,6 +134,12 @@ impl<'p> CanvasHandle<'p> {
         let image = Image::new(image.texture_id(self.ui.ctx()), (x as f32, y as f32));
 
         image.paint_at(self.ui, Rect::from_two_pos(a, b));
+    }
+
+    pub fn on_hover_ui_at_pointer(&mut self, add_contents: impl FnOnce(&mut Ui)) {
+        replace_with_or_abort(self.response, |respones| {
+            respones.on_hover_ui_at_pointer(add_contents)
+        });
     }
 
     /// returs the Rectangle in the canvas space that is currently visual
