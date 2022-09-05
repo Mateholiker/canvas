@@ -11,6 +11,7 @@ mod utility {
     pub mod coordinate_system;
 }
 
+use simple_math::{Rectangle, Vec2};
 pub use utility::coordinate_system::{Alignment, Axis, CoordinateSystem, Placement, Tick};
 
 pub use canvas_handle::CanvasHandle;
@@ -53,6 +54,12 @@ impl CanvasState {
     {
         self.current_cutout = drawable.get_cutout(draw_data);
     }
+
+    fn center_cutout(&mut self, center: Vec2) {
+        let old_center: Vec2 = self.current_cutout.center().into();
+        let translation = center - old_center;
+        self.current_cutout = self.current_cutout.translate(translation.into());
+    }
 }
 
 impl Default for CanvasState {
@@ -88,6 +95,14 @@ impl<'s, D, E: Drawable<DrawData = D>> Canvas<'s, D, E> {
 
     pub fn reset_cutout(&mut self) {
         self.state.reset_cutout(self.drawable, self.draw_data)
+    }
+
+    pub fn center_cutout(&mut self, center: Vec2) {
+        self.state.center_cutout(center);
+    }
+
+    pub fn set_cutout(&mut self, cutout: Rectangle) {
+        self.state.current_cutout = cutout.into();
     }
 
     fn manage_user_input(
@@ -208,7 +223,7 @@ impl<'s, D, E: Drawable<DrawData = D>> Canvas<'s, D, E> {
         let canvas_handle = CanvasHandle::new(
             ui,
             egui_response,
-            self.state.current_cutout,
+            &mut self.state.current_cutout,
             gui_space,
             self.state.aspect_ratio,
         );
@@ -228,7 +243,7 @@ impl<'s, D, E: Drawable<DrawData = D>> Widget for Canvas<'s, D, E> {
         let mut canvas_handle = CanvasHandle::new(
             ui,
             &mut response,
-            self.state.current_cutout,
+            &mut self.state.current_cutout,
             gui_space,
             self.state.aspect_ratio,
         );

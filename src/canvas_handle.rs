@@ -11,7 +11,7 @@ use crate::Position;
 pub struct CanvasHandle<'p> {
     ui: &'p mut Ui,
     response: &'p mut EguiResponse,
-    current_cutout: Rect,
+    current_cutout: &'p mut Rect,
     gui_space: Rect,
     aspect_ratio: f32,
 }
@@ -20,7 +20,7 @@ impl<'p> CanvasHandle<'p> {
     pub(super) fn new(
         ui: &'p mut Ui,
         response: &'p mut EguiResponse,
-        current_cutout: Rect,
+        current_cutout: &'p mut Rect,
         gui_space: Rect,
         aspect_ratio: f32,
     ) -> CanvasHandle {
@@ -36,7 +36,7 @@ impl<'p> CanvasHandle<'p> {
     pub fn convert_to_overlay_space(&self, pos: Position) -> Position {
         Position::Overlay(pos.to_overlay_space(
             self.gui_space,
-            self.current_cutout,
+            *self.current_cutout,
             self.aspect_ratio,
         ))
     }
@@ -44,13 +44,13 @@ impl<'p> CanvasHandle<'p> {
     pub fn convert_to_canvas_space(&self, pos: Position) -> Position {
         Position::Canvas(pos.to_canvas_space(
             self.gui_space,
-            self.current_cutout,
+            *self.current_cutout,
             self.aspect_ratio,
         ))
     }
 
     fn convert_to_gui_space(&self, pos: Position) -> Pos2 {
-        pos.to_gui_space(self.gui_space, self.current_cutout, self.aspect_ratio)
+        pos.to_gui_space(self.gui_space, *self.current_cutout, self.aspect_ratio)
     }
 
     pub fn bounding_box(&self) -> Rectangle {
@@ -157,5 +157,11 @@ impl<'p> CanvasHandle<'p> {
 
     pub fn dark_mode(&self) -> bool {
         self.ui.style().visuals.dark_mode
+    }
+
+    /// translates the current cutout with translation
+    /// everything calculated in Canvas Space
+    pub fn translate(&mut self, translation: Vec2) {
+        *self.current_cutout = self.current_cutout.translate(translation.into());
     }
 }
